@@ -5,9 +5,17 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.keras.preprocessing import image
 import os
+import gdown
+from io import BytesIO
 
 # Load the trained model
 MODEL_PATH = "crop_disease_model.keras"
+
+# Check if model exists, else download from Google Drive
+if not os.path.exists(MODEL_PATH):
+    st.warning("Downloading model from Google Drive (first-time setup)...")
+    file_id = "1jxIQK_ABPPbM8Y_lbNWqb9r3H8nrG_Pr"  # Replace with actual file ID
+    gdown.download(f"https://drive.google.com/uc?id={file_id}", MODEL_PATH, quiet=False)
 
 try:
     model = tf.keras.models.load_model(MODEL_PATH)
@@ -19,9 +27,9 @@ except Exception as e:
 WEATHER_API_KEY = "ee16d417a2247d41e7bb72ab630b3f28"
 
 # Function to predict disease
-def predict_disease(img_path):
+def predict_disease(img_data):
     try:
-        img = image.load_img(img_path, target_size=(128, 128))
+        img = image.load_img(img_data, target_size=(128, 128))
         img_array = image.img_to_array(img) / 255.0
         img_array = np.expand_dims(img_array, axis=0)
         prediction = model.predict(img_array)
@@ -52,18 +60,13 @@ if st.button("Get Weather"):
 
 # Disease Detection
 st.header("🍂 Crop Disease Detection")
-uploaded_file = st.file_uploader("test_leaf", type=["jpg", "png"])
+uploaded_file = st.file_uploader("Upload a leaf image", type=["jpg", "png"])
 
 if uploaded_file:
-    img_path = f"temp_{uploaded_file.name}"
-    with open(img_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
+    img_data = BytesIO(uploaded_file.read())  # Use BytesIO instead of saving a file
 
-    result = predict_disease(img_path)
+    result = predict_disease(img_data)
     st.image(uploaded_file, caption=f"Prediction: {result}")
-
-    # Remove temporary file
-    os.remove(img_path)
 
 # Inventory Management
 st.header("📊 Inventory Management")
@@ -73,5 +76,10 @@ if os.path.exists(inventory_file):
     inventory_data = pd.read_csv(inventory_file)
     st.dataframe(inventory_data)
 else:
-    st.warning("Inventory file not found. Upload `inventory.csv` to display inventory data.")
-
+    st.warning("Inventory file not found. Upload an inventory CSV file below:")
+    uploaded_inventory = st.file_uploader("Upload `inventory.csv`", type=["csv"])
+    
+    if uploaded_inventory:
+        inventory_data = pd.read_csv(uploaded_inventory)
+        st.dataframe(inventory_data)
+        inventory_data.to_csv("inventory.csv", index=False)  # Save for future use
